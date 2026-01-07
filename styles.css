@@ -227,6 +227,12 @@ body {
   box-shadow: 0 0 18px rgba(245, 178, 77, 0.6);
 }
 
+.symbol.wild-hit {
+  outline: 2px solid rgba(61, 211, 198, 0.9);
+  box-shadow: 0 0 22px rgba(61, 211, 198, 0.8);
+  animation: wildGlow 1s ease-out;
+}
+
 .reel.bounce {
   animation: reelBounce 0.25s ease-out;
 }
@@ -255,6 +261,65 @@ body {
 .win-overlay.show {
   opacity: 1;
   transform: translateY(0);
+}
+
+.free-spin-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.free-spin-overlay.show {
+  opacity: 1;
+}
+
+.free-spin-card {
+  background: rgba(12, 12, 18, 0.9);
+  border: 1px solid rgba(61, 211, 198, 0.6);
+  box-shadow: 0 0 20px rgba(61, 211, 198, 0.5);
+  border-radius: 16px;
+  padding: 18px 26px;
+  text-align: center;
+  animation: freeSpinPop 0.6s ease-out;
+}
+
+.free-spin-title {
+  font-size: 14px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.free-spin-count {
+  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+  font-size: 44px;
+  letter-spacing: 4px;
+  color: #3dd3c6;
+  margin: 6px 0;
+  text-shadow: 0 0 16px rgba(61, 211, 198, 0.6);
+}
+
+.free-spin-sub {
+  font-size: 12px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+@keyframes freeSpinPop {
+  0% { transform: scale(0.85); opacity: 0.2; }
+  60% { transform: scale(1.05); opacity: 1; }
+  100% { transform: scale(1); }
+}
+
+@keyframes wildGlow {
+  0% { transform: scale(0.98); filter: brightness(0.9); }
+  50% { transform: scale(1.02); filter: brightness(1.2); }
+  100% { transform: scale(1); filter: brightness(1); }
 }
 
 .controls {
@@ -432,6 +497,8 @@ button:disabled {
 
   body {
     overflow: auto;
+    align-items: flex-start;
+    padding: 16px 0 32px;
   }
 }
 

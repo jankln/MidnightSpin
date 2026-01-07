@@ -4,9 +4,12 @@ const config = {
   betLevels: [1, 2, 5, 10, 20, 50],
   startBalance: 100,
   reelSpinDuration: 650,
-  reelStopDelay: 180,
+  reelStopDelay: 240,
   spinBuffer: 10,
   autoSpinDelay: 420,
+  wildSpinBonus: 260,
+  reelStartGap: 220,
+  freeSpinAward: 10,
   symbols: [
     { id: "ember", label: "EMBER", color: "#ff6b3d", weight: 14, payout: { 3: 4, 4: 8, 5: 16 } },
     { id: "moon", label: "MOON", color: "#c4c2ff", weight: 13, payout: { 3: 4, 4: 9, 5: 18 } },
@@ -25,7 +28,8 @@ const state = {
   soundEnabled: true,
   spinning: false,
   lastWin: 0,
-  autoSpin: false
+  autoSpin: false,
+  freeSpins: 0
 };
 
 const dom = {
@@ -33,12 +37,15 @@ const dom = {
   balance: document.getElementById("balance"),
   bet: document.getElementById("bet"),
   lastWin: document.getElementById("lastWin"),
+  freeSpins: document.getElementById("freeSpins"),
   spinBtn: document.getElementById("spinBtn"),
   autoSpinBtn: document.getElementById("autoSpinBtn"),
   betUp: document.getElementById("betUp"),
   betDown: document.getElementById("betDown"),
   soundToggle: document.getElementById("soundToggle"),
   winOverlay: document.getElementById("winOverlay"),
+  freeSpinOverlay: document.getElementById("freeSpinOverlay"),
+  freeSpinCount: document.getElementById("freeSpinCount"),
   toast: document.getElementById("toast"),
   paytableList: document.getElementById("paytableList"),
   resetBtn: document.getElementById("resetBtn")
@@ -47,6 +54,70 @@ const dom = {
 const wildSymbol = config.symbols.find((symbol) => symbol.wild);
 let toastTimeout = null;
 let autoSpinTimer = null;
+let audioCtx = null;
+
+function getAudioContext() {
+  const Context = window.AudioContext || window.webkitAudioContext;
+  if (!Context) {
+    return null;
+  }
+  if (!audioCtx) {
+    audioCtx = new Context();
+  }
+  if (audioCtx.state === "suspended") {
+    audioCtx.resume();
+  }
+  return audioCtx;
+}
+
+function playWinSound(amount) {
+  if (!state.soundEnabled) {
+    return;
+  }
+  const ctx = getAudioContext();
+  if (!ctx) {
+    return;
+  }
+  const now = ctx.currentTime;
+  const base = 220 + Math.min(amount, 200) * 0.6;
+  const notes = [1, 1.25, 1.5, 2];
+  notes.forEach((ratio, index) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "triangle";
+    osc.frequency.value = base * ratio;
+    gain.gain.value = 0;
+    osc.connect(gain).connect(ctx.destination);
+    const start = now + index * 0.08;
+    gain.gain.setValueAtTime(0, start);
+    gain.gain.linearRampToValueAtTime(0.07, start + 0.03);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.16);
+    osc.start(start);
+    osc.stop(start + 0.18);
+  });
+}
+
+function playSpinSound() {
+  if (!state.soundEnabled) {
+    return;
+  }
+  const ctx = getAudioContext();
+  if (!ctx) {
+    return;
+  }
+  const now = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = "sawtooth";
+  osc.frequency.setValueAtTime(180, now);
+  osc.frequency.exponentialRampToValueAtTime(520, now + 0.35);
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(0.07, now + 0.05);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.5);
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(now);
+  osc.stop(now + 0.55);
+}
 
 function randomFloat() {
   if (window.crypto && window.crypto.getRandomValues) {
@@ -100,6 +171,7 @@ function updateUI() {
   dom.balance.textContent = state.balance.toString();
   dom.bet.textContent = config.betLevels[state.betIndex].toString();
   dom.lastWin.textContent = state.lastWin.toString();
+  dom.freeSpins.textContent = state.freeSpins.toString();
   dom.spinBtn.textContent = state.spinning ? "SPINNING" : "SPIN";
   dom.spinBtn.disabled = state.spinning;
   dom.betUp.disabled = state.spinning || state.autoSpin || state.betIndex >= config.betLevels.length - 1;
@@ -169,6 +241,7 @@ function createSymbol(symbol, reelIndex, rowIndex) {
 
 function clearHighlights() {
   document.querySelectorAll(".symbol.win").forEach((el) => el.classList.remove("win"));
+  document.querySelectorAll(".symbol.wild-hit").forEach((el) => el.classList.remove("wild-hit"));
 }
 
 function highlightWin(indices) {
@@ -177,6 +250,19 @@ function highlightWin(indices) {
     if (symbol) {
       symbol.classList.add("win");
     }
+  });
+}
+
+function highlightWilds(reelSymbols) {
+  reelSymbols.forEach((reel, reelIndex) => {
+    reel.forEach((symbol, rowIndex) => {
+      if (symbol.id === wildSymbol.id) {
+        const el = document.querySelector(`.symbol[data-reel="${reelIndex}"][data-row="${rowIndex}"]`);
+        if (el) {
+          el.classList.add("wild-hit");
+        }
+      }
+    });
   });
 }
 
@@ -259,12 +345,23 @@ function showWin(amount) {
   }, 1400);
 }
 
+function showFreeSpinPopup(amount) {
+  if (!dom.freeSpinOverlay || !dom.freeSpinCount) {
+    return;
+  }
+  dom.freeSpinCount.textContent = `+${amount}`;
+  dom.freeSpinOverlay.classList.add("show");
+  setTimeout(() => {
+    dom.freeSpinOverlay.classList.remove("show");
+  }, 1400);
+}
+
 function scheduleAutoSpin() {
   if (!state.autoSpin) {
     return;
   }
   const bet = config.betLevels[state.betIndex];
-  if (state.balance < bet) {
+  if (state.balance < bet && state.freeSpins === 0) {
     state.autoSpin = false;
     showToast("Auto spin stopped - balance too low.");
     updateUI();
@@ -281,7 +378,8 @@ function spin() {
   }
 
   const bet = config.betLevels[state.betIndex];
-  if (state.balance < bet) {
+  const useFreeSpin = state.freeSpins > 0;
+  if (!useFreeSpin && state.balance < bet) {
     showToast("Not enough balance.");
     if (state.autoSpin) {
       state.autoSpin = false;
@@ -291,19 +389,37 @@ function spin() {
   }
 
   state.spinning = true;
-  state.balance -= bet;
+  if (!useFreeSpin) {
+    state.balance -= bet;
+  }
   state.lastWin = 0;
   clearHighlights();
   updateUI();
+  playSpinSound();
 
   const finalSymbols = [];
   for (let i = 0; i < config.reels; i += 1) {
     finalSymbols.push(Array.from({ length: config.rows }, () => weightedPick()));
   }
 
+  const wildCount = finalSymbols.reduce(
+    (count, reel) => count + reel.filter((symbol) => symbol.id === wildSymbol.id).length,
+    0
+  );
+  if (wildCount >= 3) {
+    state.freeSpins += config.freeSpinAward;
+    showFreeSpinPopup(config.freeSpinAward);
+    showToast(`+${config.freeSpinAward} Free Spins`);
+  }
+
   const spins = finalSymbols.map((symbols, index) => {
-    const duration = config.reelSpinDuration + index * config.reelStopDelay;
-    return spinReel(index, symbols, duration);
+    const duration = config.reelSpinDuration + index * config.reelStopDelay + (wildCount > 0 ? config.wildSpinBonus : 0);
+    const startDelay = index * config.reelStartGap;
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        spinReel(index, symbols, duration).then(resolve);
+      }, startDelay);
+    });
   });
 
   Promise.all(spins).then(() => {
@@ -312,7 +428,16 @@ function spin() {
       state.balance += result.winAmount;
       state.lastWin = result.winAmount;
       showWin(result.winAmount);
+      playWinSound(result.winAmount);
       highlightWin(result.winningIndices);
+    }
+
+    if (wildCount > 0) {
+      highlightWilds(finalSymbols);
+    }
+
+    if (useFreeSpin) {
+      state.freeSpins = Math.max(0, state.freeSpins - 1);
     }
 
     state.spinning = false;
@@ -362,6 +487,7 @@ function resetGame() {
   state.soundEnabled = true;
   state.lastWin = 0;
   state.autoSpin = false;
+  state.freeSpins = 0;
   if (autoSpinTimer) {
     clearTimeout(autoSpinTimer);
     autoSpinTimer = null;
