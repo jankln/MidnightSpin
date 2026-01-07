@@ -106,17 +106,65 @@ function playSpinSound() {
     return;
   }
   const now = ctx.currentTime;
+  const duration = 1.9;
+
+  const noiseBuffer = ctx.createBuffer(1, ctx.sampleRate * duration, ctx.sampleRate);
+  const data = noiseBuffer.getChannelData(0);
+  for (let i = 0; i < data.length; i += 1) {
+    data[i] = (Math.random() * 2 - 1) * 0.5;
+  }
+
+  const noise = ctx.createBufferSource();
+  noise.buffer = noiseBuffer;
+  const noiseFilter = ctx.createBiquadFilter();
+  noiseFilter.type = "bandpass";
+  noiseFilter.frequency.setValueAtTime(420, now);
+  noiseFilter.frequency.exponentialRampToValueAtTime(920, now + duration);
+
+  const noiseGain = ctx.createGain();
+  noiseGain.gain.setValueAtTime(0.0001, now);
+  noiseGain.gain.exponentialRampToValueAtTime(0.08, now + 0.2);
+  noiseGain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+  const whirr = ctx.createOscillator();
+  whirr.type = "sawtooth";
+  whirr.frequency.setValueAtTime(140, now);
+  whirr.frequency.exponentialRampToValueAtTime(520, now + duration);
+
+  const whirrGain = ctx.createGain();
+  whirrGain.gain.setValueAtTime(0.0001, now);
+  whirrGain.gain.exponentialRampToValueAtTime(0.05, now + 0.15);
+  whirrGain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+  noise.connect(noiseFilter).connect(noiseGain).connect(ctx.destination);
+  whirr.connect(whirrGain).connect(ctx.destination);
+
+  noise.start(now);
+  noise.stop(now + duration);
+  whirr.start(now);
+  whirr.stop(now + duration);
+}
+
+function playWildSound() {
+  if (!state.soundEnabled) {
+    return;
+  }
+  const ctx = getAudioContext();
+  if (!ctx) {
+    return;
+  }
+  const now = ctx.currentTime;
   const osc = ctx.createOscillator();
   const gain = ctx.createGain();
-  osc.type = "sawtooth";
-  osc.frequency.setValueAtTime(180, now);
-  osc.frequency.exponentialRampToValueAtTime(520, now + 0.35);
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(520, now);
+  osc.frequency.exponentialRampToValueAtTime(880, now + 0.2);
   gain.gain.setValueAtTime(0.0001, now);
-  gain.gain.exponentialRampToValueAtTime(0.07, now + 0.05);
-  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.5);
+  gain.gain.exponentialRampToValueAtTime(0.08, now + 0.05);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.35);
   osc.connect(gain).connect(ctx.destination);
   osc.start(now);
-  osc.stop(now + 0.55);
+  osc.stop(now + 0.4);
 }
 
 function randomFloat() {
@@ -253,6 +301,26 @@ function highlightWin(indices) {
   });
 }
 
+function highlightVerticalWins(reelIndices) {
+  reelIndices.forEach((reelIndex) => {
+    for (let row = 0; row < config.rows; row += 1) {
+      const symbol = document.querySelector(`.symbol[data-reel="${reelIndex}"][data-row="${row}"]`);
+      if (symbol) {
+        symbol.classList.add("win");
+      }
+    }
+  });
+}
+
+function highlightDiagonalWins(positions) {
+  positions.forEach((pos) => {
+    const symbol = document.querySelector(`.symbol[data-reel="${pos.reel}"][data-row="${pos.row}"]`);
+    if (symbol) {
+      symbol.classList.add("win");
+    }
+  });
+}
+
 function highlightWilds(reelSymbols) {
   reelSymbols.forEach((reel, reelIndex) => {
     reel.forEach((symbol, rowIndex) => {
@@ -321,13 +389,84 @@ function evaluateWin(reelSymbols) {
   });
 
   const winningIndices = best.count >= 3 ? Array.from({ length: best.count }, (_, i) => i) : [];
-  return { winAmount: best.amount, winningIndices };
+
+  let verticalWin = 0;
+  const verticalReels = [];
+  reelSymbols.forEach((reel, reelIndex) => {
+    const firstId = reel[0].id;
+    const allMatch = reel.every((symbol) => symbol.id === firstId);
+    if (allMatch) {
+      const symbol = config.symbols.find((entry) => entry.id === firstId);
+      if (symbol && symbol.payout[3]) {
+        verticalWin += symbol.payout[3] * config.betLevels[state.betIndex];
+        verticalReels.push(reelIndex);
+      }
+    }
+  });
+
+  const diagonalLines = [
+    [
+      { reel: 0, row: 0 },
+      { reel: 1, row: 1 },
+      { reel: 2, row: 2 },
+      { reel: 3, row: 1 },
+      { reel: 4, row: 0 }
+    ],
+    [
+      { reel: 0, row: 2 },
+      { reel: 1, row: 1 },
+      { reel: 2, row: 0 },
+      { reel: 3, row: 1 },
+      { reel: 4, row: 2 }
+    ]
+  ];
+
+  let diagonalWin = 0;
+  const diagonalPositions = [];
+  diagonalLines.forEach((line) => {
+    const lineSymbols = line.map((pos) => reelSymbols[pos.reel][pos.row]);
+    let bestLine = { amount: 0, count: 0 };
+    config.symbols.forEach((symbol) => {
+      const count = countMatchesLine(lineSymbols, symbol.id);
+      const payout = symbol.payout[count];
+      if (count >= 3 && payout) {
+        const amount = payout * config.betLevels[state.betIndex];
+        if (amount > bestLine.amount) {
+          bestLine = { amount, count };
+        }
+      }
+    });
+    if (bestLine.count >= 3) {
+      diagonalWin += bestLine.amount;
+      diagonalPositions.push(...line.slice(0, bestLine.count));
+    }
+  });
+
+  return {
+    winAmount: best.amount + verticalWin + diagonalWin,
+    winningIndices,
+    verticalReels,
+    diagonalPositions
+  };
 }
 
 function countMatches(middle, targetId) {
   let count = 0;
   for (let i = 0; i < middle.length; i += 1) {
     const symbol = middle[i];
+    if (symbol.id === targetId || (wildSymbol && symbol.id === wildSymbol.id)) {
+      count += 1;
+    } else {
+      break;
+    }
+  }
+  return count;
+}
+
+function countMatchesLine(lineSymbols, targetId) {
+  let count = 0;
+  for (let i = 0; i < lineSymbols.length; i += 1) {
+    const symbol = lineSymbols[i];
     if (symbol.id === targetId || (wildSymbol && symbol.id === wildSymbol.id)) {
       count += 1;
     } else {
@@ -430,10 +569,13 @@ function spin() {
       showWin(result.winAmount);
       playWinSound(result.winAmount);
       highlightWin(result.winningIndices);
+      highlightVerticalWins(result.verticalReels);
+      highlightDiagonalWins(result.diagonalPositions);
     }
 
     if (wildCount > 0) {
       highlightWilds(finalSymbols);
+      playWildSound();
     }
 
     if (useFreeSpin) {

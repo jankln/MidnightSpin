@@ -502,6 +502,18 @@ button:disabled {
   }
 }
 
+@media (max-height: 760px) {
+  .app {
+    height: auto;
+  }
+
+  body {
+    overflow: auto;
+    align-items: flex-start;
+    padding: 16px 0 32px;
+  }
+}
+
 @media (max-width: 860px) {
   :root {
     --reel-w: 110px;
