@@ -1,0 +1,124 @@
+1) Zielgruppe & Nutzung
+
+Primäre Nutzung: Desktop (1280×720 bis 1920×1080), Maus + Tastatur.
+
+Mobile/Tablet: nur “funktioniert noch”, kein perfektes Layout nötig.
+
+2) Layout (Desktop)
+
+Fixed Stage / Game Frame zentriert (z. B. 1100px Breite), drum herum Background.
+
+3 Zonen:
+
+Header: Logo/Name, “Demo”-Badge, Sound Toggle
+
+Slot Cabinet: Walzen + animierter Rahmen
+
+Control Panel: Guthaben, Einsatz, Spin, Auto-Spin (optional), letzte Gewinne
+
+Mindestabstände / Bedienbarkeit
+
+Buttons groß genug für Maus: mindestens ~44px Höhe.
+
+Hover-States überall (Buttons, Toggles).
+
+3) Slot-Mechanik (Functional)
+3.1 Grunddaten
+
+Genau 1 Slot (kein Lobby-Screen nötig).
+
+Reels: empfohlen 5 Walzen, 3 Reihen sichtbar.
+
+Paylines: Standard 1 Payline (Mitte) + Paytable sichtbar.
+
+Symbole: 8 Symbole (inkl. 1 Wild optional).
+
+3.2 Controls
+
+Spin Button (primär, groß)
+
+Shortcut: Space startet Spin
+
+Einsatz ändern
+
+- / + Buttons
+
+Shortcut: Pfeiltasten ↑/↓ (oder + / -)
+
+Reset (optional): setzt Guthaben auf Startwert
+
+Sound Toggle (optional): Shortcut M
+
+3.3 Spin Ablauf & Zustände
+
+Während Spin:
+
+Spin-Button deaktiviert + “SPINNING…” State
+
+Einsatz-Controls deaktiviert
+
+Stop-Timing:
+
+Reel 1–5 stoppen versetzt (z. B. je 150–250 ms Abstand)
+
+Nach Stop:
+
+Gewinnberechnung
+
+Gewinn-Overlay: “WIN +X”
+
+Highlight der Gewinnsymbole auf Payline
+
+3.4 RNG & Fairness
+
+RNG clientseitig über crypto.getRandomValues() (Fallback Math.random).
+
+Hinweis im Footer: “Ergebnisse werden lokal erzeugt – Demo”.
+
+4) UI/UX Details (Desktop)
+
+Animationen:
+
+Reel spin mit easing (CSS transform / requestAnimationFrame)
+
+Kleine “bounce” beim Stop (optional)
+
+Feedback:
+
+Hover + active + disabled states
+
+Fehlerhinweis bei zu wenig Guthaben (Toast oder Inline)
+
+Paytable Panel:
+
+Rechts oder unter dem Slot
+
+Immer sichtbar auf Desktop
+
+5) Nicht-funktionale Anforderungen
+
+Performance: 60 FPS auf typischen Desktop-Laptops.
+
+Keine Layout-Shifts (feste Größen für Reel-Fenster).
+
+Konfiguration zentral (JSON/TS-Objekt) für:
+
+Symbol-Set, Gewichte, Paytable, Startbalance, Einsatzstufen
+
+6) Persistenz (lokal)
+
+localStorage:
+
+balance, bet, soundEnabled
+
+“Neues Spiel” Button (optional) löscht localStorage für den Slot.
+
+7) Akzeptanzkriterien (Desktop)
+
+1280×720: Alles sichtbar ohne Scrollen (Slot + Controls + Paytable).
+
+Space startet Spin, während Spin keine Doppelstarts möglich.
+
+Gewinnlogik stimmt mit Paytable überein.
+
+localStorage speichert Guthaben/Einsatz über Reload.

@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Midnight Spin</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="bg-glow"></div>
+  <div class="app">
+    <header class="header">
+      <div class="logo">Midnight Spin</div>
+      <div class="badge">DEMO</div>
+      <button id="soundToggle" class="toggle" type="button">Sound: On</button>
+    </header>
+
+    <main class="main">
+      <section class="stage">
+        <div class="cabinet">
+          <div class="cabinet-frame">
+            <div class="reels" id="reels"></div>
+            <div class="win-overlay" id="winOverlay">WIN +0</div>
+          </div>
+        </div>
+
+        <div class="controls">
+          <div class="stat">
+            <div class="label">Balance</div>
+            <div class="value" id="balance">0</div>
+          </div>
+          <div class="stat">
+            <div class="label">Bet</div>
+            <div class="value" id="bet">0</div>
+            <div class="bet-controls">
+              <button id="betDown" type="button">-</button>
+              <button id="betUp" type="button">+</button>
+            </div>
+          </div>
+          <div class="stat">
+            <div class="label">Last Win</div>
+            <div class="value" id="lastWin">0</div>
+          </div>
+          <div class="actions">
+            <button id="spinBtn" class="spin" type="button">SPIN</button>
+            <button id="autoSpinBtn" class="auto" type="button">AUTO OFF</button>
+            <button id="resetBtn" class="ghost" type="button">New Game</button>
+          </div>
+          <div class="toast" id="toast"></div>
+        </div>
+      </section>
+
+      <aside class="paytable">
+        <h3>Paytable</h3>
+        <div id="paytableList" class="paytable-list"></div>
+        <div class="note">Payline: center row</div>
+      </aside>
+    </main>
+
+    <footer class="footer">Results are generated locally - demo.</footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
